@@ -1,0 +1,5 @@
+{
+  "AppName": "brickbreaker",
+  "Standalone": true,
+  "LogLevel": "INFO"
+}
