@@ -17,6 +17,11 @@ type CreateNew struct {
 	Name string
 }
 
+type IsAuthenticatedRequest struct {}
+type IsAuthenticatedResponse struct {
+	Authenticated bool `json:"authenticated"`
+}
+
 func NewManager() *Manager {
 	return &Manager{
 		channel: starx.ChannelService.NewChannel("Account"),
@@ -47,4 +52,12 @@ func (m *Manager) Authenticate(s *session.Session, msg *Credentials) error {
 	s.Set("account", &acc)
 
 	return s.Response(response.OK())
+}
+
+
+func (m *Manager) IsAuthenticated(s *session.Session, msg *IsAuthenticatedRequest) error {
+
+	return s.Response(response.OKWithData(IsAuthenticatedResponse{
+		Authenticated:s.Uid > 0,
+	}))
 }

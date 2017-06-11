@@ -24,20 +24,18 @@ type JoinRequest struct {
 	GameID int64 `json:"game_id"`
 }
 
-type LeaveRequest struct {
+type LeaveRequest struct {}
+
+
+func (game *Game) update() {
 
 }
 
-
-func (game *Game) update() error {
-	return nil
-}
-
-func (game *Game) End() error {
+func (game *Game) End() {
 	game.Leave(game.p1, &LeaveRequest{})
 	game.Leave(game.p2, &LeaveRequest{})
-
-	return nil
+	game.channel.Destroy()
+	delete(gs.games, game.ID)
 }
 
 func (game *Game) Join(s *session.Session, msg *JoinRequest) error {
@@ -61,6 +59,8 @@ func (game *Game) Join(s *session.Session, msg *JoinRequest) error {
 }
 
 func (game *Game) Leave(s *session.Session, msg *LeaveRequest) error {
+	s.State()
+
 	if game.channel.IsContain(s.Uid) {
 		game.End()
 		return s.Response(response.OK())

@@ -24,7 +24,6 @@ func main() {
 
 	starx.SetCheckOriginFunc(func(_ *http.Request) bool { return true })
 
-	logic.StartUpdating()
 	starx.Run()
 	logic.StopUpdating()
 }

@@ -2,72 +2,82 @@ package logic
 
 import (
 	"github.com/chrislonng/starx"
-	"errors"
 	"github.com/chrislonng/starx/timer"
 	"time"
 )
 
-var games []*Game
-var gameTimer *timer.Timer
-var gameCount int64 = 0
+type gameService struct {
+	gameIdIndex int64
+	games map[int64]*Game
+	gameTimer *timer.Timer
+}
+
+var gs = newGameService()
+
+func newGameService() (gs *gameService) {
+	gs = &gameService {
+		0,
+		make(map[int64]*Game, 0),
+		timer.Register(time.Millisecond * 10,updateGames),
+	}
+	return
+}
+
+
+func getNextGameID() (id int64) {
+	id = gs.gameIdIndex
+	gs.gameIdIndex += 1
+	return
+}
 
 func RegisterGame(p1 int64, p2 int64) (game *Game) {
 
 	game = NewGame(p1, p2)
 	starx.Register(game)
+	gs.games[game.ID] = game
 	return
 }
 
 
 func NewGame(p1 int64, p2 int64) (game *Game) {
 
-	game = &Game{
-		ID:       gameCount,
-		P1ID:     p1,
-		P2ID:     p2,
-		channel:  starx.ChannelService.NewChannel("Game"),
-	}
+	id := getNextGameID()
 
-	gameCount++
+	game = &Game{
+		ID:      id,
+		P1ID:    p1,
+		P2ID:    p2,
+		channel: starx.ChannelService.NewChannel("Game_" + string(id)),
+	}
 
 	return
 }
 
-func EndGame(id int64) {
-	/*game, index, err := findGameByID(id)
-	game.End()
-	games = append(games[:index], games[index+1:]...)*/
+func EndGameByID(id int64) {
+	FindGameByID(id).End()
 }
 
-func findGameByID(id int64) (*Game, int,  error) {
+func GetGames() (games []*Game) {
+	games = make([]*Game, len(gs.games))
+	return
+}
 
-	for index, game := range games {
-		if game.ID == id {
-			return game, index, nil
-		}
-	}
 
-	return nil, -1, errors.New("Could not find game with id " + string(id))
+func FindGameByID(id int64) *Game {
+	return gs.games[id]
 }
 
 func CountGames() int {
-	return len(games)
+	return len(GetGames())
 }
 
-func StartUpdating() error {
-	/*for _, game := range games {
-		// update game here
-	}*/
-
-	gameTimer = timer.Register(time.Millisecond * 10, func() {
-		for _, game := range games {
-			game.update()
-		}
-	})
-	return nil
+func updateGames() {
+	for _, game := range GetGames() {
+		game.update()
+	}
 }
 
 func StopUpdating() {
 
-	gameTimer.Stop()
+	gs.gameTimer.Stop()
 }
