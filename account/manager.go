@@ -17,6 +17,10 @@ type CreateNew struct {
 	Name string
 }
 
+type IDRequest struct {
+	AccountID int64 `json:"account_id"`
+}
+
 type IsAuthenticatedRequest struct {}
 type IsAuthenticatedResponse struct {
 	Authenticated bool `json:"authenticated"`
@@ -29,27 +33,37 @@ func NewManager() *Manager {
 }
 
 func (m *Manager) Register(s *session.Session, msg *CreateNew) error {
-
 	// try to create account here.
 
-	_, credentials, _ := NewAccount(msg.Name)
+	if s.Uid > 0 {
+		return s.Response(response.BadRequest())
+	}
+
+	_, credentials, err := NewAccount(msg.Name)
+
+	if err != nil {
+		return s.Response(response.BadRequestWithError(err))
+	}
 
 	return s.Response(response.OKWithData(credentials))
 }
 
 func (m *Manager) Authenticate(s *session.Session, msg *Credentials) error {
 
-	acc, err := RetrieveAccount(msg.ID, msg.Key)
-
-	if err != nil {
-		return s.Response(response.InternalError())
+	if s.Uid > 0 {
+		return s.Response(response.BadRequest())
 	}
 
-	s.Bind(acc.ID)     // binding session uid
-	m.channel.Add(s) // add session to channel
+	acc := AuthenticateAccount(msg.ID, msg.Key)
+	if acc == nil {
+		return s.Response(response.BadRequest())
+	}
+
+	s.Bind(acc.ID)
+	s.Set("Name", acc.Name)
+	m.channel.Add(s)
 
 
-	s.Set("account", &acc)
 
 	return s.Response(response.OK())
 }
@@ -60,4 +74,16 @@ func (m *Manager) IsAuthenticated(s *session.Session, msg *IsAuthenticatedReques
 	return s.Response(response.OKWithData(IsAuthenticatedResponse{
 		Authenticated:s.Uid > 0,
 	}))
+}
+
+
+func (m *Manager) RetrieveAccountInfo(s *session.Session, msg *IDRequest) error {
+
+	acc := RetrieveAccount(msg.AccountID)
+
+	if acc == nil {
+		return s.Response(response.BadRequest())
+	}
+
+	return s.Response(response.OKWithData(acc))
 }

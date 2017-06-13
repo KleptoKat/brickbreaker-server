@@ -8,7 +8,6 @@ import (
 	"github.com/chrislonng/starx/timer"
 	"time"
 	"github.com/KleptoKat/brickbreaker-server/logic"
-	"github.com/KleptoKat/brickbreaker-server/account"
 )
 
 type Matchmaker struct {
@@ -32,7 +31,6 @@ type SearchRequest struct {
 
 type FoundGameMessage struct {
 	GameID int64 `json:"game_id"`
-	OpposingName string `json:"opposing_string"`
 }
 
 
@@ -41,10 +39,14 @@ func NewMatchmaker() (mm *Matchmaker) {
 		queue:    make([]session.Session, 0),
 		maxGames: 50,
 		channel:  starx.ChannelService.NewChannel("Matchmaker"),
-		timer:    timer.Register(time.Second, mm.update),
+		timer:    nil,
 	}
-
+	defer mm.startUpdateTimer()
 	return mm
+}
+
+func (mm *Matchmaker) startUpdateTimer() {
+	mm.timer = timer.Register(time.Second, mm.update)
 }
 
 func (mm *Matchmaker) update() {
@@ -84,7 +86,6 @@ func sendGameToMember(s *session.Session, opposingS *session.Session, g *logic.G
 
 	msg := FoundGameMessage {
 		GameID:g.ID,
-		OpposingName: opposingS.Value("account").(account.Account).Name(),
 	}
 
 	return s.Push("JoinGame", msg)
@@ -104,8 +105,6 @@ func (mm *Matchmaker) getSearchStatus(s *session.Session) SearchStatus {
 
 
 func (mm *Matchmaker) StartSearching(s *session.Session, msg *SearchRequest) error {
-
-
 	return s.Response(response.BadRequest())
 }
 

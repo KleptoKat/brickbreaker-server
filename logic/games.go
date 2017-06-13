@@ -18,11 +18,10 @@ func newGameService() (gs *gameService) {
 	gs = &gameService {
 		0,
 		make(map[int64]*Game, 0),
-		timer.Register(time.Millisecond * 10,updateGames),
+		nil,
 	}
 	return
 }
-
 
 func getNextGameID() (id int64) {
 	id = gs.gameIdIndex
@@ -62,6 +61,10 @@ func GetGames() (games []*Game) {
 	return
 }
 
+func StartTimer() {
+
+	gs.gameTimer = timer.Register(time.Millisecond * 10,updateGames)
+}
 
 func FindGameByID(id int64) *Game {
 	return gs.games[id]
@@ -75,9 +78,4 @@ func updateGames() {
 	for _, game := range GetGames() {
 		game.update()
 	}
-}
-
-func StopUpdating() {
-
-	gs.gameTimer.Stop()
 }

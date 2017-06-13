@@ -1,12 +1,19 @@
 package account
 
+import (
+	"errors"
+	"github.com/KleptoKat/brickbreaker-server/database"
+	"github.com/chrislonng/starx/log"
+	"math/rand"
+)
+
 type Account struct {
-	ID int64
-	name string
+	ID   int64 `json:"id"`
+	Name string `json:"name"`
 }
 
 type Credentials struct {
-	ID int64 `json:"id"`
+	ID int64 `json:"id,string,omitempty"`
 	Key string `json:"key"`
 }
 
@@ -15,46 +22,91 @@ func (account *Account) SetName(Name string) (*Account) {
 	// do validation
 	// enter into database
 
-	account.name = Name
+	account.Name = Name
 	return account
 }
 
-func (account *Account) Name() string {
-	return account.name
+func validateName(name string) bool {
+
+	return len(name) >= 1 && len(name) <= 12
 }
 
-func validateName(name string) error {
-	return nil
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandStringBytesRmndr(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63() % int64(len(letterBytes))]
+	}
+	return string(b)
 }
 
 func NewAccount(name string) (acc *Account, credentials *Credentials, err error) {
 
-	err = validateName(name)
+	if !validateName(name) {
+		return nil, nil, errors.New("Invalid Name.")
+	}
+	key := RandStringBytesRmndr(128)
+
+	stmt, err := database.DB().Prepare("INSERT INTO Account (Name, AuthKey) VALUES (?, ?);")
+
 	if err != nil {
-		return
+		log.Error(err)
+	}
+
+	defer stmt.Close()
+
+	res, err := stmt.Exec(name, key)
+	if err != nil {
+		log.Error(err)
+	}
+
+	rowCnt, err := res.RowsAffected()
+	if err != nil {
+		log.Error(err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		log.Error(err)
+	}
+
+	if rowCnt == 0 {
+		log.Error(err)
 	}
 
 
-	// do validation on name
-
 	acc = &Account {
-		int64(32424),
-		"Billy",
+		int64(id),
+		name,
 	}
 
 	credentials = &Credentials {
 		ID:acc.ID,
-		Key:"key",
+		Key:key,
 	}
 
 	return
 }
 
-func RetrieveAccount(accountID int64, key string) (*Account, error) {
-	acc := &Account {
-		int64(32424),
-		"Billy",
+
+func RetrieveAccount(id int64) (acc *Account) {
+	acc = &Account {}
+	err := database.DB().QueryRow("select ID, Name from Account where ID = ?", id).Scan(&acc.ID, &acc.Name)
+
+	if err != nil {
+		log.Error(err)
+		return nil
 	}
 
-	return acc, nil
+	return
+
+}
+
+func AuthenticateAccount(accountID int64, key string) *Account {
+
+
+	return &Account {
+		 2347242,
+		"Billy",
+	}
 }

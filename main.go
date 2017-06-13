@@ -9,6 +9,7 @@ import (
 	"github.com/KleptoKat/brickbreaker-server/account"
 	"github.com/KleptoKat/brickbreaker-server/logic"
 	"github.com/KleptoKat/brickbreaker-server/matchmaking"
+	"github.com/KleptoKat/brickbreaker-server/database"
 )
 
 func main() {
@@ -23,7 +24,8 @@ func main() {
 	log.SetLevel(log.LevelDebug)
 
 	starx.SetCheckOriginFunc(func(_ *http.Request) bool { return true })
-
+	database.OpenConnection()
+	logic.StartTimer()
 	starx.Run()
-	logic.StopUpdating()
+	database.CloseConnection()
 }
