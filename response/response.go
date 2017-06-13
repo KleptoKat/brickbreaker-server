@@ -2,7 +2,8 @@ package response
 
 type Response struct {
 	Code int `json:"code"`
-	Data interface {} `json:"data"`
+	Description string `json:"description,omitempty"`
+	Data interface {} `json:"data,omitempty"`
 }
 
 type ErrorData struct {
@@ -31,6 +32,13 @@ func InternalError() Response {
 func BadRequest() Response {
 	return Response {
 		Code:400,
+	}
+}
+
+func BadRequestWithDescription(desc string) Response {
+	return Response {
+		Code:400,
+		Description:desc,
 	}
 }
 

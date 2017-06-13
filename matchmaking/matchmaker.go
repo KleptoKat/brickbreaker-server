@@ -8,11 +8,13 @@ import (
 	"github.com/chrislonng/starx/timer"
 	"time"
 	"github.com/KleptoKat/brickbreaker-server/logic"
+	"strconv"
+	"github.com/chrislonng/starx/log"
 )
 
 type Matchmaker struct {
 
-	queue []session.Session
+	queue []*session.Session
 	maxGames int
 	timer *timer.Timer
 
@@ -36,7 +38,7 @@ type FoundGameMessage struct {
 
 func NewMatchmaker() (mm *Matchmaker) {
 	mm = &Matchmaker{
-		queue:    make([]session.Session, 0),
+		queue:    make([]*session.Session, 0),
 		maxGames: 50,
 		channel:  starx.ChannelService.NewChannel("Matchmaker"),
 		timer:    nil,
@@ -79,6 +81,8 @@ func (mm *Matchmaker) match(p1 int64, p2 int64) {
 
 	sendGameToMember(s1, s2, game)
 	sendGameToMember(s2, s1, game)
+
+
 }
 
 
@@ -105,8 +109,25 @@ func (mm *Matchmaker) getSearchStatus(s *session.Session) SearchStatus {
 
 
 func (mm *Matchmaker) StartSearching(s *session.Session, msg *SearchRequest) error {
-	return s.Response(response.BadRequest())
+
+	if s.Uid == 0 {
+		return s.Response(response.BadRequestWithDescription("Not logged in"))
+	}
+
+	log.Debugf("player id started matchmaking: " + strconv.FormatInt(s.Uid, 10), nil)
+
+	if mm.channel.IsContain(s.Uid) {
+
+		return s.Response(response.BadRequestWithDescription("Already searching with id " +
+			strconv.FormatInt(s.Uid, 10)))
+	}
+
+	mm.channel.Add(s)
+	mm.queue = append(mm.queue, s)
+
+	return s.Response(response.OKWithData(mm.getSearchStatus(s)))
 }
+
 
 func (mm *Matchmaker) RetrieveSearchStatus(s *session.Session, msg *SearchRequest) error {
 
