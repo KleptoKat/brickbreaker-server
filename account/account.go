@@ -99,14 +99,35 @@ func RetrieveAccount(id int64) (acc *Account) {
 	}
 
 	return
-
 }
 
-func AuthenticateAccount(accountID int64, key string) *Account {
+func AuthenticateAccount(id int64, key string) (*Account) {
 
+	acc := &Account {}
 
-	return &Account {
-		 2347242,
-		"Billy",
+	err := database.DB().QueryRow(
+		"select ID, Name from Account where ID = ? AND AuthKey = ?",
+		id, key).Scan(
+		&acc.ID, &acc.Name)
+
+	if err != nil {
+		return nil
 	}
+
+	return acc
+}
+
+
+func GetNameByID(id int64) (name string) {
+	var name string = ""
+	err := database.DB().QueryRow("select Name from Account where ID = ?", id).Scan(&name)
+
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	return
+
+
 }

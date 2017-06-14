@@ -60,10 +60,9 @@ func (m *Manager) Authenticate(s *session.Session, msg *Credentials) error {
 	}
 
 	s.Bind(acc.ID)
+
 	s.Set("Name", acc.Name)
 	m.channel.Add(s)
-
-
 
 	return s.Response(response.OK())
 }

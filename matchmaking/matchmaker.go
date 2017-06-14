@@ -9,7 +9,6 @@ import (
 	"time"
 	"github.com/KleptoKat/brickbreaker-server/logic"
 	"strconv"
-	"github.com/chrislonng/starx/log"
 )
 
 type Matchmaker struct {
@@ -61,10 +60,9 @@ func (mm *Matchmaker) update() {
 			mm.match(active, Uid)
 			active = 0
 		} else {
-			break // breaks if there is players waiting and
+			break // breaks if there is players waiting and too many games playing.
 		}
 	}
-
 }
 
 
@@ -82,7 +80,8 @@ func (mm *Matchmaker) match(p1 int64, p2 int64) {
 	sendGameToMember(s1, s2, game)
 	sendGameToMember(s2, s1, game)
 
-
+	mm.remove(s1)
+	mm.remove(s2)
 }
 
 
@@ -114,8 +113,6 @@ func (mm *Matchmaker) StartSearching(s *session.Session, msg *SearchRequest) err
 		return s.Response(response.BadRequestWithDescription("Not logged in"))
 	}
 
-	log.Debugf("player id started matchmaking: " + strconv.FormatInt(s.Uid, 10), nil)
-
 	if mm.channel.IsContain(s.Uid) {
 
 		return s.Response(response.BadRequestWithDescription("Already searching with id " +
@@ -124,6 +121,35 @@ func (mm *Matchmaker) StartSearching(s *session.Session, msg *SearchRequest) err
 
 	mm.channel.Add(s)
 	mm.queue = append(mm.queue, s)
+
+	return s.Response(response.OKWithData(mm.getSearchStatus(s)))
+}
+
+func (mm *Matchmaker) remove (s *session.Session)  {
+	mm.channel.Leave(s.Uid)
+	for i,mem := range mm.queue {
+		if mem.Uid == s.Uid {
+			mm.queue = append(mm.queue[:i], mm.queue[i+1:]...)
+			break
+		}
+	}
+}
+
+func (mm *Matchmaker) StopSearching(s *session.Session, msg *SearchRequest) error {
+
+	if s.Uid == 0 {
+		return s.Response(response.BadRequestWithDescription("Not logged in"))
+	}
+
+	if mm.channel.IsContain(s.Uid) {
+		mm.channel.Leave(s.Uid)
+		for i,mem := range mm.queue {
+			if mem.Uid == s.Uid {
+				mm.queue = append(mm.queue[:i], mm.queue[i+1:]...)
+				return s.Response(response.OKWithData(mm.getSearchStatus(s)))
+			}
+		}
+	}
 
 	return s.Response(response.OKWithData(mm.getSearchStatus(s)))
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/KleptoKat/brickbreaker-server/logic"
 	"github.com/KleptoKat/brickbreaker-server/matchmaking"
 	"github.com/KleptoKat/brickbreaker-server/database"
+	"time"
 )
 
 func main() {
@@ -17,6 +18,7 @@ func main() {
 	starx.SetServersConfig("configs/servers.json")
 	starx.Register(account.NewManager())
 	starx.Register(matchmaking.NewMatchmaker())
+	starx.Register(logic.NewGameService())
 
 	starx.SetServerID("brickbreaker-server-1")
 	starx.SetSerializer(json.NewSerializer())
@@ -25,7 +27,7 @@ func main() {
 
 	starx.SetCheckOriginFunc(func(_ *http.Request) bool { return true })
 	database.OpenConnection()
-	logic.StartTimer()
+	starx.SetHeartbeatInternal(5*time.Second)
 	starx.Run()
 	database.CloseConnection()
 }
