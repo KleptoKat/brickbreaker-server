@@ -4,120 +4,223 @@ import (
 	"github.com/chrislonng/starx/component"
 	"github.com/chrislonng/starx"
 	"github.com/chrislonng/starx/session"
-	"github.com/KleptoKat/brickbreaker-server/response"
-	"github.com/KleptoKat/brickbreaker-server/account"
+	"time"
 )
 
+const (
+	GAME_STATE_PREP          = 0
+	GAME_STATE_READY         = 1
+	GAME_STATE_STARTING      = 2
+	GAME_STATE_RUNNING       = 3
+	GAME_STATE_ENDED         = 4
+	GAME_STATE_CANCELED      = 5
+
+	GAME_START_INTERVAL      = 3000
+	GAME_PREP_TIMEOUT        = 6000
+
+	GAME_WORLD_WIDTH         = 900
+	GAME_WORLD_HEIGHT        = 1600
+)
 
 type Game struct {
 	ID int64 `json:"id"`
-	P1ID int64 `json:"p1"`
-	P2ID int64 `json:"p2"`
-	State string `json:"state"`
+	State int `json:"state"`
+	lastState int
+	ready bool
+
+	createTime time.Time
+	startTime time.Time
+
+	lastUpdate time.Time
+	lastNetworkUpdate time.Time
 
 	p1 *session.Session
 	p2 *session.Session
+
+	height int
+	width int
+
+	bodies map[int]*Body
+	bodyIdIndex int
 
 	component.Base
 	channel *starx.Channel
 }
 
-type GameMessage struct {
+type FullGameUpdate struct {
 	GameID int64 `json:"game_id"`
 	OpposingName string `json:"opposing_name"`
-	State string `json:"state"`
+	State int `json:"state"`
+	Width int `json:"width"`
+	Height int `json:"height"`
+	Bodies []bodyWithTypeAndID `json:"bodies"`
 }
 
 
 type GameState struct {
-	State string `json:"state"`
+	State int `json:"state"`
 }
 
 type LeaveRequest struct {}
 
 
-func (game *Game) update() {
-	/*if game.p1 != nil && game.p2 != nil {
-		game.State = "ready"
-		game.onStateChange()
-	}*/
+type StartTimeMessage struct {
+	Start int64 `json:"start"`
+	Duration int `json:"dur"` // in milliseconds
+
 }
 
-func (game *Game) End() {
-	game.Leave(game.p1, &LeaveRequest{})
-	game.Leave(game.p2, &LeaveRequest{})
-	game.channel.Destroy()
-	delete(gs.games, game.ID)
+func (game *Game) bodyUpdate() {
+	//delta := time.Now().Sub(game.lastUpdate)
+
+}
+
+func (game *Game) networkUpdate() {
+	//delta := time.Now().Sub(game.lastUpdate)
+
+}
+
+func (game *Game) update() {
+
+	// do body update
+	// do network update
+
+
+	game.lastState = game.State
+	game.updateState()
+	if game.lastState != game.State {
+		game.onStateChange()
+	}
+}
+
+func (game *Game) updateState() {
+	switch game.State {
+	case GAME_STATE_PREP:
+		// Will set game state to ready when all players have joined and the matchmaker is ready.
+		if game.channel.IsContain(game.p1.Uid) && game.channel.IsContain(game.p2.Uid) && game.ready {
+			game.State = GAME_STATE_READY
+			break
+		}
+
+		// If prep lasts for too long the game will time out.
+		if game.createTime.UnixNano() + GAME_PREP_TIMEOUT*1000000 < time.Now().UnixNano() {
+			game.Cancel()
+		}
+		break
+	case GAME_STATE_STARTING:
+		if game.startTime.UnixNano() < time.Now().UnixNano() {
+			game.run()
+		}
+		break
+	}
+
+}
+func (game *Game) run() {
+
+	game.State = GAME_STATE_RUNNING
+
+}
+
+
+func (game *Game) SetReady() {
+	game.ready = true
+}
+
+func (game *Game) startIn(interval time.Duration) {
+	game.startTime = time.Now().Add(interval)
+
+	game.State = GAME_STATE_STARTING
+	game.channel.Broadcast("GameStartTime", &StartTimeMessage {
+		Start:game.startTime.UnixNano(),
+		Duration:int(interval.Nanoseconds()/1000000),
+	})
 }
 
 func (game *Game) onStateChange() {
 	game.channel.Broadcast("GameStateMessage", &GameState {
 		State:game.State,
 	})
+
+	switch game.State {
+	case GAME_STATE_READY:
+		game.startIn(GAME_START_INTERVAL * 1000000)
+	}
 }
 
-func (game *Game) Leave(s *session.Session, msg *LeaveRequest) error {
-	if game == nil {
-		return s.Response(response.BadRequestWithDescription("No game"))
-
-	}
-
-	s.State()
-
-	if game.channel.IsContain(s.Uid) {
-		game.End()
-		return s.Response(response.OK())
-	}
-
-	return s.Response(response.BadRequest())
+func (game *Game) incrementBodyIndex() {
+	game.bodyIdIndex = game.bodyIdIndex + 1
 }
 
-func (gs *GameService) JoinGame(s *session.Session, msg *JoinRequest) error {
-
-	game := FindGameByID(msg.GameID)
-	if game == nil {
-		return s.Response(response.BadRequestWithDescription("No game"))
-	}
-
-	if gs.findGameByInGamePlayerID(s.Uid) != nil {
-		return s.Response(response.BadRequestWithDescription("Already in game."))
-	}
-
-	var opposingID int64;
-	if s.Uid == game.P1ID {
-		game.p1 = s
-		opposingID = game.P2ID;
-	} else if s.Uid == game.P2ID {
-		game.p2 = s
-		opposingID = game.P1ID;
-	} else {
-		return s.Response(response.BadRequest())
-	}
-
-
-	game.channel.Add(s) // add session to channel
-
-	return s.Response(response.OKWithData(&GameMessage{
-		GameID:game.ID,
-		OpposingName:*account.GetNameByID(opposingID),
-		State:game.State,
-	}))
+func (game *Game) getNextBodyID() int {
+	defer game.incrementBodyIndex()
+	return game.bodyIdIndex
 }
 
-func (gs *GameService) Leave(s *session.Session, msg *LeaveRequest) error {
+/*
+func (game *Game) getBricks() []*Brick {
+	return game.bodies
+}
 
-	game := gs.findGameByPlayerID(s.Uid)
-	if game == nil {
-		return s.Response(response.BadRequestWithDescription("No game"))
+func (game *Game) getP1Paddle() *Paddle {
+	return game.bodies
+}
 
+func (game *Game) getP2Paddle() *Paddle {
+	return game.bodies
+}
+
+
+func (game *Game) getBalls() []*Ball {
+	return game.bodies
+}*/
+
+func (game *Game) getBodies() map[int]*Body {
+	return game.bodies
+}
+
+type bodyWithTypeAndID struct {
+	B *Body `json:"b"`
+	ID int `json:"id"`
+	T int `json:"t"`
+}
+
+func (game *Game) getBodiesWithType() []bodyWithTypeAndID {
+	bodies := make([]bodyWithTypeAndID,0)
+
+	var newBody bodyWithTypeAndID
+	for id, body := range game.bodies {
+
+		newBody = bodyWithTypeAndID{
+			body,
+			id,
+			(*body).GetType(),
+		}
+
+		bodies = append(bodies, newBody)
 	}
 
-	s.State()
+	return bodies
+}
 
-	if game.channel.IsContain(s.Uid) {
-		game.End()
-		return s.Response(response.OK())
-	}
 
-	return s.Response(response.BadRequest())
+
+func (game *Game) addBodyNow(body Body) {
+	game.bodies[game.getNextBodyID()] = &body
+}
+
+func (game *Game) remove() {
+	game.channel.Destroy()
+	delete(gs.games, game.ID)
+}
+
+func (game *Game) Cancel() {
+	game.State = GAME_STATE_CANCELED
+	game.onStateChange()
+	game.remove()
+}
+
+func (game *Game) End() {
+	game.State = GAME_STATE_ENDED
+	game.onStateChange()
+	game.remove()
 }

@@ -13,7 +13,7 @@ type Account struct {
 }
 
 type Credentials struct {
-	ID int64 `json:"id,string,omitempty"`
+	ID int64 `json:"id,omitempty"`
 	Key string `json:"key"`
 }
 
@@ -119,7 +119,7 @@ func AuthenticateAccount(id int64, key string) (*Account) {
 
 
 func GetNameByID(id int64) (name string) {
-	var name string = ""
+	name = ""
 	err := database.DB().QueryRow("select Name from Account where ID = ?", id).Scan(&name)
 
 	if err != nil {

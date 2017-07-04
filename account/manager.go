@@ -67,7 +67,6 @@ func (m *Manager) Authenticate(s *session.Session, msg *Credentials) error {
 	return s.Response(response.OK())
 }
 
-
 func (m *Manager) IsAuthenticated(s *session.Session, msg *IsAuthenticatedRequest) error {
 
 	return s.Response(response.OKWithData(IsAuthenticatedResponse{
@@ -77,6 +76,10 @@ func (m *Manager) IsAuthenticated(s *session.Session, msg *IsAuthenticatedReques
 
 
 func (m *Manager) RetrieveAccountInfo(s *session.Session, msg *IDRequest) error {
+
+	if msg.AccountID == 0 {
+		msg.AccountID = s.Uid
+	}
 
 	acc := RetrieveAccount(msg.AccountID)
 
